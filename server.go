@@ -59,18 +59,22 @@ func (s *RestServer) start(blockchain *Blockchain, wg *sync.WaitGroup) {
 type TcpServer struct {
 }
 
-func handleRequest(conn net.Conn) {
+func handlePeerConnection(blockchain *Blockchain, client *net.Conn) {
+	conn := *client
+	blockchain.sockets = append(blockchain.sockets, client)
+	fmt.Println("Peer connected", conn.RemoteAddr())
 	defer conn.Close()
+	defer blockchain.removePeer(client)
 	buf := make([]byte, 1024)
 	for {
 		_, err := conn.Read(buf)
 		if err != nil {
 			fmt.Println("Error reading:", err.Error())
+			break
 		}
 		fmt.Printf(conn.RemoteAddr().String() + ":" + string(buf))
 		conn.Write([]byte("Message received."))
 		buf = make([]byte, 1024)
-
 	}
 }
 
@@ -90,8 +94,6 @@ func (t *TcpServer) start(blockchain *Blockchain, wg *sync.WaitGroup) {
 			fmt.Println("Error accepting: ", err.Error())
 			os.Exit(1)
 		}
-		fmt.Println("New client connected", client.RemoteAddr())
-		// Handle connections in a new goroutine.
-		go handleRequest(client)
+		go handlePeerConnection(blockchain, &client)
 	}
 }
