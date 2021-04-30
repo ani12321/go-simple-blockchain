@@ -4,31 +4,49 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"time"
 )
-
-type Block struct {
-	Index        int
-	PreviousHash string
-	Timestamp    time.Time
-	Data         string
-	Hash         string
-}
 
 type Blockchain struct {
 	Data       []Block
 	restServer *RestServer
 	tcpServer  *TcpServer
 	sockets    []*net.Conn
+	difficulty int
 }
 
 func (b *Blockchain) getLatestBlock() *Block {
 	var l = len(b.Data)
+	if l == 0 {
+		return nil
+	}
 	return &b.Data[l-1]
 }
 
 func (b *Blockchain) add(block *Block) {
+	latestBlock := b.getLatestBlock()
+	if latestBlock != nil {
+		block.PreviousHash = latestBlock.Hash
+	}
+	block.Hash = block.computeHash()
+	fmt.Println("Applying proof of work")
+	block.proofOfWork(b.difficulty)
+	fmt.Println("Proof of work complete")
 	b.Data = append(b.Data, *block)
+}
+
+func (b *Blockchain) checkValidity() bool {
+	for i := 1; i < len(b.Data); i++ {
+		currentBlock := b.Data[i]
+		previousBlock := b.Data[i-1]
+
+		if currentBlock.Hash != currentBlock.computeHash() {
+			return false
+		}
+		if currentBlock.PreviousHash != previousBlock.Hash {
+			return false
+		}
+	}
+	return true
 }
 
 func (b *Blockchain) startServer() {
